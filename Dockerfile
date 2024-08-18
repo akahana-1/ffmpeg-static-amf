@@ -1,6 +1,6 @@
-FROM ubuntu:20.04 as builder
+FROM debian:12
 ENV DEBIAN_FRONTEND noninteractive
-ARG FFMPEG_VERSION="5.1.2"
+ARG FFMPEG_VERSION="7.0.2"
 ARG PROCS=4
 
 RUN set -x \
@@ -14,7 +14,9 @@ RUN set -x \
 	cmake \
 	pkg-config \
 	libfreetype6-dev \
-	libgnutls28-dev \
+	libssl-dev \
+	libtls-dev \
+	libcrypt-dev \
 	libgl1-mesa-dev \
 	libdrm-dev \
 	meson \
@@ -26,6 +28,7 @@ RUN set -x \
 	libx265-dev \
 	texinfo \
 	curl \
+	wget \
 	ca-certificates \
 	&& mkdir -p /tmp/ffmpeg_sources /tmp/ffmpeg_build /root/.bin
 
@@ -33,7 +36,7 @@ WORKDIR /tmp/ffmpeg_sources
 ENV PATH "/root/.bin:$PATH"
 
 # get NASM
-RUN curl -o nasm.tar.xz -L https://www.nasm.us/pub/nasm/releasebuilds/2.15.05/nasm-2.15.05.tar.xz \
+RUN curl -o nasm.tar.xz -L https://www.nasm.us/pub/nasm/releasebuilds/2.16.03/nasm-2.16.03.tar.xz \
 	&& mkdir nasm \
 	&& tar --strip-components=1 -xf nasm.tar.xz -C nasm \
 	&& cd nasm \
@@ -52,7 +55,7 @@ RUN curl -o lame.tar.gz -L https://sourceforge.net/projects/lame/files/lame/3.10
 	&& make install
 
 # get aac library
-RUN git clone --depth 1 -b v2.0.2 https://github.com/mstorsjo/fdk-aac \
+RUN git clone --depth 1 -b v2.0.3 https://github.com/mstorsjo/fdk-aac \
 	&& cd fdk-aac \
 	&& autoreconf -fiv \
 	&& ./configure --prefix="/tmp/ffmpeg_build" --disable-shared \
@@ -60,7 +63,7 @@ RUN git clone --depth 1 -b v2.0.2 https://github.com/mstorsjo/fdk-aac \
 	&& make install
 
 # get opus library
-RUN git clone --depth 1 -b v1.3.1 https://github.com/xiph/opus.git \
+RUN git clone --depth 1 -b v1.5.2 https://github.com/xiph/opus.git \
 	&& cd opus \
 	&& ./autogen.sh \
 	&& ./configure --prefix="/tmp/ffmpeg_build" --disable-shared \
@@ -84,7 +87,7 @@ RUN git -C x264 pull 2> /dev/null || git clone --depth 1 https://code.videolan.o
 	&& make install
 
 # get x265 library
-RUN git clone --depth 1 -b 3.5 https://bitbucket.org/multicoreware/x265_git.git x265 \
+RUN git clone --depth 1 -b 3.6 https://bitbucket.org/multicoreware/x265_git.git x265 \
 	&& cd x265/build/linux \
 	&& cmake -G "Unix Makefiles" -DCMAKE_INSTALL_PREFIX="/tmp/ffmpeg_build" \
 	-DENABLE_SHARED:BOOL=OFF -DSTATIC_LINK_CRT:BOOL=ON \
@@ -95,7 +98,7 @@ RUN git clone --depth 1 -b 3.5 https://bitbucket.org/multicoreware/x265_git.git 
 	&& make install
 
 # get av1 decode library (dav1d)
-RUN git clone --depth 1 -b 1.0.0 https://code.videolan.org/videolan/dav1d \
+RUN git clone --depth 1 -b 1.4.2 https://code.videolan.org/videolan/dav1d \
 	&& mkdir dav1d/build \
 	&& cd dav1d/build \
 	&& meson setup -Denable_tools=false \
@@ -108,7 +111,7 @@ RUN git clone --depth 1 -b 1.0.0 https://code.videolan.org/videolan/dav1d \
 	&& ninja install
 
 # get av1 library (svt-av1)
-RUN git clone --depth 1 -b v1.2.1 https://gitlab.com/AOMediaCodec/SVT-AV1 \
+RUN git clone --depth 1 -b v2.1.2 https://gitlab.com/AOMediaCodec/SVT-AV1 \
 	&& mkdir SVT-AV1/build \
 	&& cd SVT-AV1/build \
 	&& cmake -G "Unix Makefiles" \
@@ -148,7 +151,7 @@ RUN git clone --depth 1 -b v2.16-branch https://github.com/intel/libva.git libva
 	&& make install
 
 # get ffmpeg source
-RUN git clone --depth 1 -b n${FFMPEG_VERSION} https://github.com/FFmpeg/FFmpeg ffmpeg \
+RUN set -x && git clone --depth 1 -b n${FFMPEG_VERSION} https://github.com/FFmpeg/FFmpeg ffmpeg \
 	&& cd ffmpeg \
 	&& PKG_CONFIG_PATH="/tmp/ffmpeg_build/lib/pkgconfig" \
 	./configure \
@@ -169,6 +172,7 @@ RUN git clone --depth 1 -b n${FFMPEG_VERSION} https://github.com/FFmpeg/FFmpeg f
 	--enable-libvorbis \
 	--enable-libx264 \
 	--enable-libx265 \
+	--enable-libtls \
 	--enable-nonfree \
 	--enable-small \
 	--enable-static \
